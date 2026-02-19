@@ -38,7 +38,7 @@ Import this crate into your project by adding the following line to your `cargo.
 
 ```rust
 [dependencies]
-dinvoke_rs = "0.2.0"
+dinvoke_rs = "0.2.1"
 ```
 
 # Examples
@@ -111,8 +111,6 @@ fn main() {
         } 
     }   
 }
-
-
 ```
 
 ## Executing indirect syscall
@@ -129,7 +127,7 @@ fn main() {
     unsafe 
     {
         let function_type:NtQueryInformationProcess;
-        let mut ret: Option<i32> = None; //NtQueryInformationProcess returns a NTSTATUS, which is a i32.
+        let ret: Option<i32>; //NtQueryInformationProcess returns a NTSTATUS, which is a i32.
         let handle = GetCurrentProcess();
         let p = PROCESS_BASIC_INFORMATION::default();
         let process_information: PVOID = std::mem::transmute(&p); 
@@ -146,7 +144,7 @@ fn main() {
             return_length
         );
 
-        let pbi:*mut PROCESS_BASIC_INFORMATION;
+        let pbi: *mut PROCESS_BASIC_INFORMATION;
         match ret {
             Some(x) => 
                 if x == 0 {
@@ -159,7 +157,6 @@ fn main() {
 
     }
 }
-
 ```
 
 ## Manual PE mapping
@@ -196,7 +193,6 @@ fn main() {
 
     }
 }
-
 ```
 
 ## Overload memory section
@@ -234,7 +230,6 @@ fn main() {
 
     }
 }
-
 ```
 
 ## Module fluctuation
@@ -286,7 +281,6 @@ fn main() {
 
     }
 }
-
 ```
 
 ## Syscall parameters spoofing
@@ -309,14 +303,14 @@ fn main() {
         let handler = dinvoke_rs::dinvoke::breakpoint_handler as usize;
         dinvoke_rs::dinvoke::add_vectored_exception_handler(1, handler);
 
-        let h = HANDLE {0: -1};
+        let h = HANDLE {0: -1 as _};
         let handle: *mut HANDLE = std::mem::transmute(&h);
         let access = THREAD_ALL_ACCESS; 
         let a = OBJECT_ATTRIBUTES::default(); // https://github.com/Kudaes/rust_tips_and_tricks/tree/main#transmute
         let attributes: *mut OBJECT_ATTRIBUTES = std::mem::transmute(&a);
         // We set the PID of the remote process 
         let remote_pid = 472isize;
-        let c = ClientId {unique_process: HANDLE {0: remote_pid}, unique_thread: HANDLE::default()};
+        let c = ClientId {unique_process: HANDLE {0: remote_pid as _}, unique_thread: HANDLE::default()};
         let client_id: *mut ClientId = std::mem::transmute(&c);
         // A call to NtOpenProcess is performed through Dinvoke. The parameters will be
         // automatically spoofed by the function and restored to the original values
@@ -328,7 +322,6 @@ fn main() {
         dinvoke_rs::dinvoke::use_hardware_breakpoints(false);
     }
 }
-
 ```
 
 ## Module stomping and Shellcode fluctuation

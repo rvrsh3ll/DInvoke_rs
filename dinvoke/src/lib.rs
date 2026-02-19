@@ -14,10 +14,8 @@ use std::os::windows::ffi::OsStringExt;
 use nanorand::{WyRand, Rng};
 use winapi::um::psapi::{EnumProcessModules, GetModuleBaseNameW, GetModuleFileNameExW};
 use winapi::shared::ntdef::LARGE_INTEGER;
-use windows::Win32::Foundation::BOOL;
 use windows::Win32::Security::SECURITY_ATTRIBUTES;
 #[cfg(target_arch = "x86_64")]
-use windows::Win32::System::Diagnostics::Debug::{GetThreadContext,SetThreadContext};
 use windows::Win32::System::Memory::MEMORY_BASIC_INFORMATION;
 use windows::Win32::System::SystemInformation::SYSTEM_INFO;
 use windows::Win32::System::Threading::PROCESS_BASIC_INFORMATION;
@@ -28,9 +26,9 @@ use windows::Win32::{Foundation::{HANDLE, HINSTANCE,UNICODE_STRING}, System::Thr
 #[cfg(target_arch = "x86")]
 use windows::Win32::{Foundation::{HANDLE, HINSTANCE,UNICODE_STRING}, System::Threading::GetCurrentProcess};
 #[cfg(all(target_arch = "x86_64", not(feature = "syscall")))]
-use data::{ApiSetNamespace, ApiSetNamespaceEntry, ApiSetValueEntry, ClientId, EntryPoint, ExceptionHandleFunction, ExceptionPointers, LptopLevelExceptionFilter, NtAllocateVirtualMemoryArgs, NtCreateThreadExArgs, NtOpenProcessArgs, NtProtectVirtualMemoryArgs, NtWriteVirtualMemoryArgs, PeMetadata, PsAttributeList, PsCreateInfo, CONTEXT, DLL_PROCESS_ATTACH, EAT, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE, PROCESS_QUERY_LIMITED_INFORMATION, PVOID, TLS_OUT_OF_INDEXES, MAX_PATH};
+use data::{ApiSetNamespace, ApiSetNamespaceEntry, ApiSetValueEntry, ClientId, EntryPoint, ExceptionHandleFunction, ExceptionPointers, LptopLevelExceptionFilter, NtAllocateVirtualMemoryArgs, NtCreateThreadExArgs, NtOpenProcessArgs, NtProtectVirtualMemoryArgs, NtWriteVirtualMemoryArgs, PeMetadata, PsAttributeList, PsCreateInfo, DLL_PROCESS_ATTACH, EAT, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PAGE_READWRITE, PROCESS_QUERY_LIMITED_INFORMATION, PVOID, TLS_OUT_OF_INDEXES, MAX_PATH};
 #[cfg(all(target_arch = "x86_64", feature = "syscall"))]
-use data::{ApiSetNamespace, ApiSetNamespaceEntry, ApiSetValueEntry, ClientId, EntryPoint, ExceptionHandleFunction, ExceptionPointers, LptopLevelExceptionFilter, NtAllocateVirtualMemoryArgs, NtCreateThreadExArgs, NtOpenProcessArgs, NtProtectVirtualMemoryArgs, NtWriteVirtualMemoryArgs, PeMetadata, PsAttributeList, PsCreateInfo, CONTEXT, DLL_PROCESS_ATTACH, EAT, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PROCESS_QUERY_LIMITED_INFORMATION, PVOID, TLS_OUT_OF_INDEXES, MAX_PATH};
+use data::{ApiSetNamespace, ApiSetNamespaceEntry, ApiSetValueEntry, ClientId, EntryPoint, ExceptionHandleFunction, ExceptionPointers, LptopLevelExceptionFilter, NtAllocateVirtualMemoryArgs, NtCreateThreadExArgs, NtOpenProcessArgs, NtProtectVirtualMemoryArgs, NtWriteVirtualMemoryArgs, PeMetadata, PsAttributeList, PsCreateInfo, DLL_PROCESS_ATTACH, EAT, PAGE_EXECUTE_READWRITE, PAGE_READONLY, PROCESS_QUERY_LIMITED_INFORMATION, PVOID, TLS_OUT_OF_INDEXES, MAX_PATH};
 #[cfg(target_arch = "x86")]
 use data::{ApiSetNamespace, ApiSetNamespaceEntry, ApiSetValueEntry, ClientId, EntryPoint, LptopLevelExceptionFilter, PeMetadata, PsAttributeList, PsCreateInfo, DLL_PROCESS_ATTACH, EAT, PAGE_EXECUTE_READWRITE, PVOID, TLS_OUT_OF_INDEXES, MAX_PATH};
 
@@ -39,15 +37,15 @@ static mut HARDWARE_BREAKPOINTS: bool = false;
 #[cfg(target_arch = "x86_64")]
 static mut HARDWARE_EXCEPTION_FUNCTION: ExceptionHandleFunction = ExceptionHandleFunction::NtOpenProcess;
 #[cfg(target_arch = "x86_64")]
-static mut NT_ALLOCATE_VIRTUAL_MEMORY_ARGS: NtAllocateVirtualMemoryArgs = NtAllocateVirtualMemoryArgs{handle: HANDLE {0: -1}, base_address: ptr::null_mut()};
+static mut NT_ALLOCATE_VIRTUAL_MEMORY_ARGS: NtAllocateVirtualMemoryArgs = NtAllocateVirtualMemoryArgs{handle: HANDLE {0: -1 as _}, base_address: ptr::null_mut()};
 #[cfg(target_arch = "x86_64")]
 static mut NT_OPEN_PROCESS_ARGS: NtOpenProcessArgs = NtOpenProcessArgs{handle: ptr::null_mut(), access:0, attributes: ptr::null_mut(), client_id: ptr::null_mut()};
 #[cfg(target_arch = "x86_64")]
-static mut NT_PROTECT_VIRTUAL_MEMORY_ARGS: NtProtectVirtualMemoryArgs = NtProtectVirtualMemoryArgs{handle: HANDLE {0: -1}, base_address: ptr::null_mut(), size: ptr::null_mut(), protection: 0};
+static mut NT_PROTECT_VIRTUAL_MEMORY_ARGS: NtProtectVirtualMemoryArgs = NtProtectVirtualMemoryArgs{handle: HANDLE {0: -1 as _}, base_address: ptr::null_mut(), size: ptr::null_mut(), protection: 0};
 #[cfg(target_arch = "x86_64")]
-static mut NT_WRITE_VIRTUAL_MEMORY_ARGS: NtWriteVirtualMemoryArgs = NtWriteVirtualMemoryArgs{handle: HANDLE {0: -1}, base_address: ptr::null_mut(), buffer: ptr::null_mut(), size: 0usize};
+static mut NT_WRITE_VIRTUAL_MEMORY_ARGS: NtWriteVirtualMemoryArgs = NtWriteVirtualMemoryArgs{handle: HANDLE {0: -1 as _}, base_address: ptr::null_mut(), buffer: ptr::null_mut(), size: 0usize};
 #[cfg(target_arch = "x86_64")]
-static mut NT_CREATE_THREAD_EX_ARGS: NtCreateThreadExArgs = NtCreateThreadExArgs{thread:ptr::null_mut(), access: 0, attributes: ptr::null_mut(), process: HANDLE {0: -1}};
+static mut NT_CREATE_THREAD_EX_ARGS: NtCreateThreadExArgs = NtCreateThreadExArgs{thread:ptr::null_mut(), access: 0, attributes: ptr::null_mut(), process: HANDLE {0: -1 as _}};
 static mut HOOKED_FUNCTIONS_INFO: Vec<(usize,Vec<u8>)> = vec![];
 
 #[cfg(all(target_arch = "x86_64", feature = "syscall"))]
@@ -80,10 +78,8 @@ struct Configuration
 /// Enables or disables the use of exception handlers in
 /// combination with hardware breakpoints.
 #[cfg(target_arch = "x86_64")]
-pub fn use_hardware_breakpoints(value: bool)
-{
-    unsafe
-    {
+pub fn use_hardware_breakpoints(value: bool) {
+    unsafe {
         HARDWARE_BREAKPOINTS = value;
     }
 } 
@@ -102,22 +98,31 @@ pub fn set_hardware_breakpoint(address: usize)
 {
     unsafe
     {
-        let mut context = CONTEXT::default();   
-        context.ContextFlags = 0x100000 | 0x10; // CONTEXT_DEBUG_REGISTERS
-        let mut lp_context: *mut windows::Win32::System::Diagnostics::Debug::CONTEXT = std::mem::transmute(&context);
-        let _ = GetThreadContext(GetCurrentThread(), lp_context);
+        use data::AlignedContext;
+        use windows::Win32::System::Diagnostics::Debug::CONTEXT_FLAGS;
 
-        let context: *mut CONTEXT = std::mem::transmute(lp_context);
-        (*context).Dr0 = address as u64;
-        (*context).Dr6 = 0;
-        (*context).Dr7 = (*context).Dr7 & !(((1 << 2) - 1) << 16); // 0xfffcffff ->  Break on instruction execution only
-        (*context).Dr7 = (*context).Dr7 & !(((1 << 2) - 1) << 18); // 0xfff3ffff 
-        (*context).Dr7 = ((*context).Dr7 & !(((1 << 1) - 1) << 0)) | (1 << 0); // 0xfffffffe 
+        let mut ctx = AlignedContext::default();
+        ctx.ctx.ContextFlags = CONTEXT_FLAGS(0x100000 | 0x10); // CONTEXT_DEBUG_REGISTERS
+        let r = get_thread_context(GetCurrentThread(), &mut ctx.ctx);
+        if !r {
+            let r = get_last_error();
+            println!("{}{}", &lc!("[x] Call to GetThreadContext failed. Error code: "), r);
+            return;
+        }
 
-        (*context).ContextFlags = 0x100000 | 0x10;
-        lp_context = std::mem::transmute(context);
+        (ctx.ctx).Dr0 = address as u64;
+        (ctx.ctx).Dr6 = 0;
+        ctx.ctx.Dr7 = ctx.ctx.Dr7 & !(((1 << 2) - 1) << 16); // 0xfffcffff ->  Break on instruction execution only
+        ctx.ctx.Dr7 = ctx.ctx.Dr7 & !(((1 << 2) - 1) << 18); // 0xfff3ffff 
+        ctx.ctx.Dr7 = (ctx.ctx.Dr7 & !(((1 << 1) - 1) << 0)) | (1 << 0); // 0xfffffffe 
+        ctx.ctx.ContextFlags = CONTEXT_FLAGS(0x100000 | 0x10);
         
-        let _ = SetThreadContext(GetCurrentThread(), lp_context );
+        let r = set_thread_context(GetCurrentThread(), &ctx.ctx );
+        if !r {
+            let r = get_last_error();
+            println!("{}{}", &lc!("[x] Call to SetThreadContext failed. Error code: "), r);
+            return;
+        }
     }
 }
 
@@ -226,7 +231,7 @@ pub fn hook_function(src_address: usize, dst_address: usize) -> bool
     unsafe 
     {
         let original_address = src_address;
-        let handle = HANDLE(-1);
+        let handle = HANDLE(-1 as _);
         let base_address: *mut PVOID = std::mem::transmute(&original_address);
         let size = 4096 as usize; 
         let size: *mut usize = std::mem::transmute(&size);
@@ -343,7 +348,7 @@ pub fn unhook_function(address: usize) -> bool
         }
 
         let original_address = unhook_info.0;
-        let handle = HANDLE(-1);
+        let handle = HANDLE(-1 as _);
         let base_address: *mut PVOID = std::mem::transmute(&original_address);
         let size = 4096 as usize;   
         let size: *mut usize = std::mem::transmute(&size);
@@ -436,7 +441,7 @@ fn get_modules_list() -> Result<Vec<usize>, u32>
         let mut mod_handles: Vec<usize> = Vec::new();
         let mut reserved = 0;
         let mut needed = 0;
-        let current_process = HANDLE(-1);
+        let current_process = HANDLE(-1 as _);
         let current_process: *mut winapi::ctypes::c_void = std::mem::transmute(current_process);
 
         // Code extracted from winproc
@@ -462,7 +467,6 @@ fn get_modules_list() -> Result<Vec<usize>, u32>
             mod_handles.resize(needed as usize, 0);
         }
         
-
         Ok(mod_handles)
     }
 }
@@ -471,7 +475,7 @@ fn get_module_name(hmodule: usize) -> Result<String,u32>
 {
     unsafe 
     {
-        let current_process = HANDLE(-1);
+        let current_process = HANDLE(-1 as _);
         let current_process: *mut winapi::ctypes::c_void = std::mem::transmute(current_process);
         let mut buffer: [u16; MAX_PATH as _] = std::mem::zeroed();
 
@@ -491,7 +495,7 @@ fn get_module_path(hmodule: usize) -> Result<String,u32>
 {
     unsafe 
     {
-        let current_process = HANDLE(-1);
+        let current_process = HANDLE(-1 as _);
         let current_process: *mut winapi::ctypes::c_void = std::mem::transmute(current_process);
         let mut buffer: [u16; MAX_PATH as _] = std::mem::zeroed();
 
@@ -538,12 +542,9 @@ pub fn get_function_address(module_base_address: usize, function: &str) -> usize
         let magic = *(opt_header as *mut i16);
         let p_export: usize;
 
-        if magic == 0x010b 
-        {
+        if magic == 0x010b {
             p_export = opt_header + 0x60;
-        } 
-        else 
-        {
+        } else {
             p_export = opt_header + 0x70;
         }
 
@@ -582,8 +583,7 @@ pub fn get_function_address(module_base_address: usize, function: &str) -> usize
 
         let mut ret: usize = 0;
 
-        if function_ptr != ptr::null_mut()
-        {
+        if function_ptr != ptr::null_mut() {
             ret = function_ptr as usize;
         }
     
@@ -602,12 +602,9 @@ fn get_forward_address(function_ptr: *mut u8) -> usize {
 
         loop 
         {
-            if *ptr as char != '\0'
-            {
+            if *ptr as char != '\0' {
                 forwarded_names.push(*ptr as char);
-            }
-            else 
-            {
+            } else {
                 break;    
             }
 
@@ -615,16 +612,14 @@ fn get_forward_address(function_ptr: *mut u8) -> usize {
             c = c - 1;
 
             // Assume there wont be an exported address with len > 100
-            if c == 0
-            {
+            if c == 0 {
                 return function_ptr as usize;
             }
 
         }
 
         let values: Vec<&str> = forwarded_names.split(".").collect();
-        if values.len() != 2
-        {
+        if values.len() != 2 {
             return function_ptr as usize;
         }
 
@@ -640,12 +635,11 @@ fn get_forward_address(function_ptr: *mut u8) -> usize {
         let prev_hook = panic::take_hook();
         panic::set_hook(Box::new(|_| {}));
         let result = panic::catch_unwind(|| {
-            format!("{}{}",&forwarded_module_name[..forwarded_module_name.len() - 2], ".dll");
+            let _ = format!("{}{}",&forwarded_module_name[..forwarded_module_name.len() - 2], ".dll");
         });
         panic::set_hook(prev_hook);
 
-        if result.is_err()
-        {
+        if result.is_err() {
             return function_ptr as usize;
         }
 
@@ -658,21 +652,18 @@ fn get_forward_address(function_ptr: *mut u8) -> usize {
                 None => {forwarded_module_name}
             };
         }
-        else 
-        {
+        else {
             forwarded_module_name = forwarded_module_name + ".dll";
         }
 
         let mut module = get_module_base_address(&forwarded_module_name);
 
         // If the module is not already loaded, we try to load it dynamically calling LoadLibraryA
-        if module == 0
-        {
+        if module == 0 {
             module = load_library_a(&forwarded_module_name);
         }
 
-        if module != 0
-        {
+        if module != 0 {
             return get_function_address(module, &forwarded_export_name);
         }
 
@@ -700,12 +691,9 @@ pub fn get_api_mapping() -> HashMap<String,String> {
 
         let api_set_map_offset: usize;
 
-        if size_of::<usize>() == 4
-        {
+        if size_of::<usize>() == 4 {
             api_set_map_offset = 0x38;
-        }
-        else 
-        {
+        } else {
             api_set_map_offset = 0x68;
         }
 
@@ -740,8 +728,7 @@ pub fn get_api_mapping() -> HashMap<String,String> {
             let api_set_entry_key = format!("{}{}",&api_set_entry_name[..api_set_entry_name.len()-2], ".dll");
             let mut set_value_ptr: *mut ApiSetValueEntry = ptr::null_mut();
 
-            if set_entry.value_length == 1
-            {
+            if set_entry.value_length == 1 {
                 let value = (api_set_namespace_ptr as usize + set_entry.value_offset as usize) as *mut u8;
                 set_value_ptr = std::mem::transmute(value);
             }
@@ -767,8 +754,7 @@ pub fn get_api_mapping() -> HashMap<String,String> {
                     }
                 }
 
-                if set_value_ptr == ptr::null_mut()
-                {
+                if set_value_ptr == ptr::null_mut() {
                     set_value_ptr = (api_set_namespace_ptr as usize + set_entry.value_offset as usize) as *mut ApiSetValueEntry;
                 }
             }
@@ -782,14 +768,12 @@ pub fn get_api_mapping() -> HashMap<String,String> {
                 while r < (set_value.value_count / 2 )
                 {
                     let c = *value_ptr as char;
-                    if c != '\0' 
-                    {
+                    if c != '\0' {
                         api_set_value.push(c);
                         r = r + 1;
                     } 
     
                     value_ptr = value_ptr.add(1); 
-    
                 }
             }
 
@@ -841,12 +825,9 @@ pub fn get_ntdll_eat(module_base_address: usize) -> EAT {
         let magic = *(opt_header as *mut i16);
         let p_export: usize;
 
-        if magic == 0x010b 
-        {
+        if magic == 0x010b {
             p_export = opt_header + 0x60;
-        } 
-        else 
-        {
+        } else {
             p_export = opt_header + 0x70;
         }
 
@@ -879,7 +860,6 @@ pub fn get_ntdll_eat(module_base_address: usize) -> EAT {
                 function_name = function_name.replace("Zw", "Nt");
                 eat.insert(function_ptr as usize,function_name );
             }
-
         }
     
         eat
@@ -913,8 +893,7 @@ pub fn get_syscall_id(eat: &EAT, function_name: &str) -> u32 {
     let mut i = 0;
     for (_a,b) in eat.iter()
     {
-        if b == function_name
-        {
+        if b == function_name {
             return i;
         }
 
@@ -995,15 +974,13 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
 
     unsafe 
     {
-        if id == u32::MAX
-        {
+        if id == u32::MAX {
             return 0;
         }
         
         let mut ptr: *mut u8 = std::mem::transmute(&id);
 
-        for i in 0..4
-        {
+        for i in 0..4 {
             sh[4 + i] = *ptr;
             ptr = ptr.add(1);
         }
@@ -1012,8 +989,7 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
         let export = eat.iter().skip(id as usize).next().unwrap();
         let mut function_addr = get_function_address(ntdll, export.1);
 
-        if function_addr == 0
-        {
+        if function_addr == 0 {
             return 0;
         }
 
@@ -1029,8 +1005,7 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
                 {
                     let index = rng.generate_range(0_usize..=max_range) as usize;
         
-                    if index < max_range / 5
-                    {
+                    if index < max_range / 5 {
                         function = s;
                         break;
                     }
@@ -1038,28 +1013,24 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
         
                 function_addr = get_function_address(ntdll, function);
         
-                if function_addr == 0
-                {
+                if function_addr == 0 {
                     return 0;
                 }
         
                 syscall_addr = find_syscall_address(function_addr);
-                if syscall_addr != 0
-                {
+                if syscall_addr != 0 {
                     break;
                 }
             }
 
-            if syscall_addr == 0
-            {
+            if syscall_addr == 0 {
                 return 0;
             }
         }
 
         let mut syscall_ptr: *mut u8 = std::mem::transmute(&syscall_addr);
 
-        for j in 0..8
-        {
+        for j in 0..8 {
             sh[10 + j] = *syscall_ptr;
             syscall_ptr = syscall_ptr.add(1);
         }
@@ -1074,8 +1045,7 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
         let old_protection: *mut u32 = std::mem::transmute(&o);
         let ret = nt_allocate_virtual_memory(handle, base_address, 0, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         
-        if ret != 0
-        {
+        if ret != 0 {
             return 0;
         }
         
@@ -1084,17 +1054,14 @@ pub fn prepare_syscall(id: u32, eat: EAT) -> usize {
         let bytes_written: *mut usize = std::mem::transmute(&b);
         let ret = nt_write_virtual_memory(handle, *base_address, buffer, nsize, bytes_written);
 
-        if ret != 0
-        {
+        if ret != 0 {
             return 0;
         }
 
         let ret = nt_protect_virtual_memory(handle, base_address, size, PAGE_EXECUTE_READ, old_protection);
-
         let _r = close_handle(handle);
-        
-        if ret != 0
-        {
+
+        if ret != 0 {
             return 0;
         }
 
@@ -1123,19 +1090,17 @@ pub fn call_module_entry_point(pe_info: PeMetadata, module_base_address: usize) 
     let entry_point;
     if pe_info.is_32_bit {
         entry_point = module_base_address + pe_info.opt_header_32.AddressOfEntryPoint as usize;
-    }
-    else {
+    } else {
         entry_point = module_base_address + pe_info.opt_header_64.address_of_entry_point as usize;
-
     }
 
     unsafe 
     {
         let main: EntryPoint = std::mem::transmute(entry_point);
-        let module = HINSTANCE {0: entry_point as isize};
+        let module = HINSTANCE {0: entry_point as _};
         let ret = main(module, DLL_PROCESS_ATTACH, ptr::null_mut());
 
-        if !ret.as_bool() {
+        if !ret {
             return Err(lc!("[x] Failed to call module's entry point (DllMain -> DLL_PROCESS_ATTACH)."));
         }
 
@@ -1240,12 +1205,9 @@ pub fn ldr_get_procedure_address (module_handle: usize, function_name: &str, ord
         let f: UnsafeCell<String> = String::default().into();
         let mut fun_name: *mut String = std::mem::transmute(f.get());
 
-        if function_name == ""
-        {
+        if function_name == "" {
             fun_name = ptr::null_mut();
-        }
-        else 
-        {
+        } else {
             *fun_name = function_name.to_string();
         }
 
@@ -1255,12 +1217,9 @@ pub fn ldr_get_procedure_address (module_handle: usize, function_name: &str, ord
         match ret {
             Some(x) => 
             {
-                if x == 0
-                {
+                if x == 0 {
                     return *return_address as usize;
-                } 
-                else 
-                {
+                } else {
                     return 0;
                 }
             },
@@ -1327,21 +1286,16 @@ pub fn load_library_a_tp(module: &str) -> usize {
         let load_library = get_function_address(k32, &lc!("LoadLibraryA"));
         dynamic_invoke!(ntdll,&lc!("RtlQueueWorkItem"),func_ptr,ret,load_library,module_name,0);
 
-
         match ret
         {
             Some(x) => 
             {
-                if x != 0
-                {
+                if x != 0 {
                     return 0;
-                }
-                else 
-                {
+                } else {
                     use std::{thread, time};
                     let ten_millis = time::Duration::from_millis(500);
                     thread::sleep(ten_millis);
-            
                     return get_module_base_address(module);
                 }
             },
@@ -1380,6 +1334,39 @@ pub fn load_library_a(module: &str) -> usize {
     }     
 }
 
+/// THIS IMPLEMENTATION IS WRONG, DON'T USE IT
+/// USE load_library_a INSTEAD. WILL FIX.
+/// 
+/// Dynamically calls LoadLibraryW.
+///
+/// It will return either the module's base address or 0.
+///
+/// # Examples
+///
+/// ```
+/// let ret = dinvoke::load_library_w("ntdll.dll");
+///
+/// if ret != 0 {println!("ntdll.dll base address is 0x{:X}.", addr)};
+/// ```
+pub fn load_library_w(module: &str) -> usize {
+
+    unsafe 
+    {   
+        let ret: Option<usize>;
+        let func_ptr: data::LoadLibraryW;
+        let name = CString::new(module.to_string()).expect("");
+        let module_name: *mut u16 = std::mem::transmute(name.as_ptr()); // Need a wide char string
+        let k32 = get_module_base_address(&lc!("kernel32.dll")); 
+        dynamic_invoke!(k32,&lc!("LoadLibraryW"),func_ptr,ret,module_name);
+
+        match ret
+        {
+            Some(x) => { return x; },
+            None => { return 0; }
+        }
+    }     
+}
+
 /// Frees the loaded dll. The function expects the module's base address.
 ///
 /// If the function succeeds, the return value is nonzero.
@@ -1408,6 +1395,44 @@ pub fn free_library(module_handle: isize) -> usize {
     }     
 }
 
+/// Dynamically calls GetThreadContext
+/// Second parameter expects a windows::Win32::System::Diagnostics::Debug::CONTEXT structure properly aligned. Check `set_hardware_breakpoint`
+/// function to replicate the expected behaviour.
+pub fn get_thread_context(thread_handle: HANDLE, context_ptr: *mut windows::Win32::System::Diagnostics::Debug::CONTEXT) -> bool
+{
+    unsafe 
+    {
+        let ret: Option<bool>;
+        let func_ptr: data::GetThreadContext;
+        let module_base_address = get_module_base_address(&lc!("kernel32.dll")); 
+        dynamic_invoke!(module_base_address,&lc!("GetThreadContext"),func_ptr,ret,thread_handle,context_ptr);
+
+        match ret {
+            Some(x) => return x,
+            None => return false,
+        }
+    }
+}
+
+/// Dynamically calls SetThreadContext
+/// Second parameter expects a windows::Win32::System::Diagnostics::Debug::CONTEXT structure properly aligned. Check `set_hardware_breakpoint`
+/// function to replicate the expected behaviour.
+pub fn set_thread_context(thread_handle: HANDLE, context_ptr: *const windows::Win32::System::Diagnostics::Debug::CONTEXT) -> bool
+{
+    unsafe 
+    {
+        let ret: Option<bool>;
+        let func_ptr: data::SetThreadContext;
+        let module_base_address = get_module_base_address(&lc!("kernel32.dll")); 
+        dynamic_invoke!(module_base_address,&lc!("SetThreadContext"),func_ptr,ret,thread_handle,context_ptr);
+
+        match ret {
+            Some(x) => return x,
+            None => return false,
+        }
+    }
+}
+
 /// Dynamically calls CreateFileA.
 /// On success, it returns a valid handle to the specified file. Otherwise, a null handle is returned.
 pub fn create_file_a(name: *mut u8, access: u32, mode: u32, attributes: *const SECURITY_ATTRIBUTES, disposition: u32, flags: u32, template: HANDLE) -> HANDLE {
@@ -1421,7 +1446,25 @@ pub fn create_file_a(name: *mut u8, access: u32, mode: u32, attributes: *const S
 
         match ret {
             Some(x) => return x,
-            None => return HANDLE { 0: 0 } ,
+            None => return HANDLE { 0: ptr::null_mut() } ,
+        }
+    }   
+}
+
+/// Dynamically calls CreateFilew.
+/// On success, it returns a valid handle to the specified file. Otherwise, a null handle is returned.
+pub fn create_file_w(name: *mut u16, access: u32, mode: u32, attributes: *const SECURITY_ATTRIBUTES, disposition: u32, flags: u32, template: HANDLE) -> HANDLE {
+    
+    unsafe 
+    {
+        let ret: Option<HANDLE>;
+        let func_ptr: data::CreateFileW;
+        let kernel32 = get_module_base_address(&lc!("kernel32.dll"));
+        dynamic_invoke!(kernel32,&lc!("CreateFileW"),func_ptr,ret,name,access,mode,attributes,disposition,flags,template);
+
+        match ret {
+            Some(x) => return x,
+            None => return HANDLE { 0: ptr::null_mut() } ,
         }
     }   
 }
@@ -1457,7 +1500,7 @@ pub fn create_file_mapping_w(file: HANDLE, attributes: *const SECURITY_ATTRIBUTE
 
         match ret {
             Some(x) => return x,
-            None => return HANDLE { 0: 0 } ,
+            None => return HANDLE { 0: ptr::null_mut() } ,
         }
     }   
 }
@@ -1486,13 +1529,13 @@ pub fn unmap_view_of_file (base_address: PVOID) -> bool {
     
     unsafe 
     {
-        let ret: Option<BOOL>;
+        let ret: Option<bool>;
         let func_ptr: data::UnmapViewOfFile;
         let kernel32 = get_module_base_address(&lc!("kernel32.dll"));
         dynamic_invoke!(kernel32,&lc!("UnmapViewOfFile"),func_ptr,ret,base_address);
 
         match ret {
-            Some(x) => return x.as_bool(),
+            Some(x) => return x,
             None => return false ,
         }
     }   
@@ -1504,13 +1547,13 @@ pub fn rollback_transaction(transaction: HANDLE) -> bool {
     
     unsafe 
     {
-        let ret: Option<BOOL>;
+        let ret: Option<bool>;
         let func_ptr: data::RollbackTransaction;
         let ktmv = load_library_a(&lc!("KtmW32.dll"));
         dynamic_invoke!(ktmv,&lc!("RollbackTransaction"),func_ptr,ret,transaction);
 
         match ret {
-            Some(x) => return x.as_bool(),
+            Some(x) => return x,
             None => return false ,
         }
     }   
@@ -1611,12 +1654,9 @@ pub fn close_handle(handle: HANDLE) -> bool {
         match ret {
             Some(x) =>
             {
-                if x == 0
-                {
+                if x == 0 {
                     return false;
-                }
-                else 
-                {
+                } else {
                     return true;
                 }
             },
@@ -1790,6 +1830,23 @@ pub fn get_system_info(sysinfo: *mut SYSTEM_INFO)  {
     }   
 }
 
+/// Dynamically calls VirtualQuery.
+pub fn virtual_query(page_address: *const c_void, buffer: *mut MEMORY_BASIC_INFORMATION, length: usize)  -> usize{
+    
+    unsafe 
+    {
+        let ret: Option<usize>;
+        let func_ptr: data::VirtualQuery;
+        let kernel32 = get_module_base_address(&lc!("kernel32.dll"));
+        dynamic_invoke!(kernel32,&lc!("VirtualQuery"),func_ptr,ret,page_address,buffer,length);
+
+        match ret {
+            Some(x) => return x,
+            None => return 0 ,
+        }
+    }   
+}
+
 /// Dynamically calls VirtualQueryEx.
 pub fn virtual_query_ex(process_handle: HANDLE, page_address: *const c_void, buffer: *mut MEMORY_BASIC_INFORMATION, length: usize)  -> usize{
     
@@ -1817,10 +1874,7 @@ pub fn virtual_free(address: PVOID, size: usize, free_type: u32) -> bool {
         dynamic_invoke!(k32,&lc!("VirtualFree"),func_ptr,ret,address,size,free_type);
 
         match ret {
-            Some(x) =>
-            {
-                return x;
-            },
+            Some(x) => return x,
             None => return false,
         }
     }
@@ -1869,7 +1923,7 @@ pub fn nt_write_virtual_memory (mut handle: HANDLE, base_address: PVOID, mut buf
             NT_WRITE_VIRTUAL_MEMORY_ARGS.size = size;
             set_hardware_breakpoint(find_syscall_address(addr));
 
-            handle = HANDLE {0: -1};
+            handle = HANDLE {0: -1 as _};
             let buff = vec![20];
             buffer = std::mem::transmute(buff.as_ptr());
             size = buff.len();
@@ -1926,7 +1980,7 @@ pub fn nt_allocate_virtual_memory (mut handle: HANDLE, mut base_address: *mut PV
             NT_ALLOCATE_VIRTUAL_MEMORY_ARGS.base_address = base_address;
             set_hardware_breakpoint(find_syscall_address(addr));
 
-            handle = HANDLE {0: -1};
+            handle = HANDLE {0: -1 as _};
             base_address = ptr::null_mut();
         }
         
@@ -1981,7 +2035,7 @@ pub fn nt_protect_virtual_memory (mut handle: HANDLE, mut base_address: *mut PVO
             NT_PROTECT_VIRTUAL_MEMORY_ARGS.protection = new_protection;
             set_hardware_breakpoint(find_syscall_address(addr));
 
-            handle = HANDLE {0: -1};
+            handle = HANDLE {0: -1 as _};
             base_address = ptr::null_mut();
             let s = 10usize;
             size = std::mem::transmute(&s);
@@ -2039,12 +2093,12 @@ pub fn nt_open_process (mut handle: *mut HANDLE, mut access: u32, mut attributes
             NT_OPEN_PROCESS_ARGS.client_id = client_id;
             set_hardware_breakpoint(find_syscall_address(addr));
 
-            let h = HANDLE {0: -1};
+            let h = HANDLE {0: -1 as _};
             handle = std::mem::transmute(&h);
             access = PROCESS_QUERY_LIMITED_INFORMATION; 
             let a = OBJECT_ATTRIBUTES::default();
             attributes = std::mem::transmute(&a);
-            let c = ClientId {unique_process: HANDLE {0: std::process::id() as isize}, unique_thread: HANDLE::default()};
+            let c = ClientId {unique_process: HANDLE {0: std::process::id() as _}, unique_thread: HANDLE::default()};
             client_id = std::mem::transmute(&c);
         }
 
@@ -2132,6 +2186,25 @@ pub fn nt_query_information_file(handle: HANDLE, io: *mut IO_STATUS_BLOCK, file_
             None => return -1,
         }
     } 
+}
+
+/// Dynamically calls NtUnmapViewOfSection.
+///
+pub fn nt_unmap_view_of_section(handle: HANDLE, base_address: PVOID) -> i32 
+{
+    unsafe 
+    {
+        let ret: Option<i32>;
+        let func_ptr: data::NtUnmapViewOfSection;
+        let kernel32 = get_module_base_address(&lc!("ntdll.dll"));
+        dynamic_invoke!(kernel32,&lc!("NtUnmapViewOfSection"),func_ptr,ret,handle,base_address);
+
+        match ret {
+            Some(x) => return x,
+            None => return -1,
+        }
+    }   
+
 }
 
 /// Dynamically calls RtlAdjustPrivilege.
@@ -2266,12 +2339,12 @@ pub fn nt_create_thread_ex (mut thread: *mut HANDLE, mut access: u32, mut attrib
             NT_CREATE_THREAD_EX_ARGS.process = process;
             set_hardware_breakpoint(find_syscall_address(addr));
 
-            let h = HANDLE {0: -1};
+            let h = HANDLE {0: -1 as _};
             thread = std::mem::transmute(&h);
             access = PROCESS_QUERY_LIMITED_INFORMATION; 
             let a = OBJECT_ATTRIBUTES::default();
             attributes = std::mem::transmute(&a);
-            process = HANDLE {0: -1};
+            process = HANDLE {0: -1 as _};
         }
 
         dynamic_invoke!(ntdll,&lc!("NtCreateThreadEx"),func_ptr,ret,thread,access,attributes,process,function,args,flags,zero,stack,reserve,buffer);
@@ -2323,7 +2396,6 @@ pub fn nt_read_virtual_memory (handle: HANDLE, base_address: PVOID, buffer: PVOI
     }
 
 }
-
 
 /// Dynamically calls an exported function from the specified module.
 ///
@@ -2396,13 +2468,10 @@ macro_rules! dynamic_invoke {
     ($a:expr, $b:expr, $c:expr, $d:expr, $($e:tt)*) => {
 
         let function_ptr = $crate::get_function_address($a, $b);
-        if function_ptr != 0
-        {
+        if function_ptr != 0 {
             $c = std::mem::transmute(function_ptr);
             $d = Some($c($($e)*));
-        }
-        else
-        {
+        } else {
             $d = None;
         }
 
@@ -2444,27 +2513,22 @@ macro_rules! dynamic_invoke {
 #[macro_export]
 macro_rules! execute_syscall {
 
-    ($a:expr, $b:expr, $c:expr, $($d:tt)*) => {
-
+    ($a:expr, $b:expr, $c:expr, $($d:tt)*) => 
+    {
         let eat = $crate::get_ntdll_eat($crate::get_module_base_address("ntdll.dll"));
         let id = $crate::get_syscall_id(&eat, $a);
         if id != u32::MAX
         {
             let function_ptr = $crate::prepare_syscall(id as u32, eat);
-            if function_ptr != 0
-            {
+            if function_ptr != 0 {
                 $b = std::mem::transmute(function_ptr);
                 $c = Some($b($($d)*));
-            }
-            else
-            {
+            } else {
                 $c = None;
             }
             let ptr = std::mem::transmute(function_ptr);
             $crate::virtual_free(ptr, 0, 0x00008000);
-        }
-        else
-        {
+        } else {
             $c = None;
         }
     }
@@ -2474,8 +2538,8 @@ macro_rules! execute_syscall {
 #[macro_export]
 macro_rules! indirect_syscall {
 
-    ($a:expr, $($x:expr),*) => {
-
+    ($a:expr, $($x:expr),*) => 
+    {
         unsafe
         {
             let mut temp_vec = Vec::new();
@@ -2522,8 +2586,7 @@ pub fn prepare_syscall(function_name: &str) -> (u32, usize)
             for s in eat.values()
             {
                 let index = rng.generate_range(0..max_range);
-                if index < max_range / 5
-                {
+                if index < max_range / 5 {
                     function = s;
                     break;
                 }

@@ -1,18 +1,20 @@
 use std::{collections::BTreeMap, ffi::c_void};
-use windows::Win32::{Foundation::{BOOL, HANDLE, HINSTANCE, UNICODE_STRING}, Graphics::Printing::{DOC_INFO_1A, PRINTER_DEFAULTSA}, Security::SECURITY_ATTRIBUTES, System::{Diagnostics::{Debug::{EXCEPTION_RECORD, IMAGE_DATA_DIRECTORY, IMAGE_OPTIONAL_HEADER32, IMAGE_SECTION_HEADER, MINIDUMP_CALLBACK_INFORMATION, MINIDUMP_EXCEPTION_INFORMATION, MINIDUMP_USER_STREAM_INFORMATION}, ToolHelp::THREADENTRY32}, Memory::MEMORY_BASIC_INFORMATION, SystemInformation::SYSTEM_INFO, Threading::{PROCESS_INFORMATION, STARTUPINFOW}, WindowsProgramming::CLIENT_ID, IO::{IO_STATUS_BLOCK, OVERLAPPED}}};
+use windows::Win32::{Foundation::{HANDLE, HINSTANCE, UNICODE_STRING}, Graphics::Printing::{DOC_INFO_1A, PRINTER_DEFAULTSA}, Security::SECURITY_ATTRIBUTES, Storage::FileSystem::FILE_ID_DESCRIPTOR, System::{ApplicationInstallationAndServicing::ACTCTXW, Diagnostics::{Debug::{EXCEPTION_RECORD, IMAGE_DATA_DIRECTORY, IMAGE_OPTIONAL_HEADER32, IMAGE_SECTION_HEADER, 
+    MINIDUMP_CALLBACK_INFORMATION, MINIDUMP_EXCEPTION_INFORMATION, MINIDUMP_USER_STREAM_INFORMATION}, ToolHelp::THREADENTRY32}, IO::{IO_STATUS_BLOCK, OVERLAPPED}, Memory::MEMORY_BASIC_INFORMATION, SystemInformation::SYSTEM_INFO, Threading::{PROCESS_INFORMATION, STARTUPINFOW}, WindowsProgramming::CLIENT_ID}};
 use windows::Wdk::Foundation::OBJECT_ATTRIBUTES;
 use winapi::shared::ntdef::LARGE_INTEGER;
 
 pub type PVOID = *mut c_void;
 pub type DWORD = u32;
 pub type EAT = BTreeMap<usize,String>;
-pub type EntryPoint = extern "system" fn (HINSTANCE, u32, *mut c_void) -> BOOL;
+pub type EntryPoint = extern "system" fn (HINSTANCE, u32, *mut c_void) -> bool;
 pub type QueryInterface = unsafe extern "system" fn (*mut c_void, *const GUID, *mut *mut c_void) -> u32;
 pub type AddRef = unsafe extern "system" fn(*mut c_void) -> u32;
 pub type Release = unsafe extern "system" fn(*mut c_void) -> u32;
 pub type ImpersonateLoggedOnUser = unsafe extern "system" fn (HANDLE) -> bool; 
 pub type RevertToSelf = unsafe extern "system" fn () -> bool;
 pub type LoadLibraryA = unsafe extern "system" fn (*mut u8) -> usize;
+pub type LoadLibraryW = unsafe extern "system" fn (*mut u16) -> usize;
 pub type FreeLibrary = unsafe extern "system" fn (isize) -> HINSTANCE;
 pub type CreateToolhelp32Snapshot = unsafe extern "system" fn (u32, u32) -> HANDLE;
 pub type Thread32First = unsafe extern "system" fn (HANDLE, *mut THREADENTRY32) -> bool;
@@ -20,32 +22,33 @@ pub type Thread32Next = unsafe extern "system" fn (HANDLE, *mut THREADENTRY32) -
 pub type PostThreadMessageA = unsafe extern "system" fn (u32, u32, usize, isize) -> bool;
 pub type OpenProcess = unsafe extern "system" fn (u32, i32, u32) -> HANDLE;
 pub type OpenThread = unsafe extern "system" fn (u32, i32, u32) -> HANDLE;
-pub type OpenPrintA = unsafe extern "system" fn (*mut u8, *mut HANDLE, *mut PRINTER_DEFAULTSA) -> BOOL;
+pub type OpenPrintA = unsafe extern "system" fn (*mut u8, *mut HANDLE, *mut PRINTER_DEFAULTSA) -> bool;
 pub type StartDocPrinterA = unsafe extern "system" fn (HANDLE, u32, *mut DOC_INFO_1A) -> u32;
-pub type GetDefaultPrinterA = unsafe extern "system" fn (*mut u8, *mut u32) -> BOOL;
+pub type GetDefaultPrinterA = unsafe extern "system" fn (*mut u8, *mut u32) -> bool;
 pub type EnumProcesses = unsafe extern "system" fn (*mut u32, u32, *mut u32) -> bool;
 pub type EnumProcessModules = unsafe extern "system" fn (HANDLE, *mut usize, u32, *mut u32) -> bool;
 pub type SetPriorityClass = unsafe extern "system" fn (HANDLE, u32) -> bool;
 pub type SetThreadPriority = unsafe extern "system" fn (HANDLE, u32) -> bool;
 pub type QueueUserWorkItem = unsafe extern "system" fn (*mut c_void, *mut c_void, u32) -> bool;
-pub type InitializeProcThreadAttributeList = unsafe extern "system" fn (PVOID, u32, u32, *mut usize) -> BOOL;
-pub type UpdateProcThreadAttribute = unsafe extern "system" fn (PVOID, u32, usize, *const c_void, usize, PVOID, *const usize) -> BOOL;
+pub type InitializeProcThreadAttributeList = unsafe extern "system" fn (PVOID, u32, u32, *mut usize) -> bool;
+pub type UpdateProcThreadAttribute = unsafe extern "system" fn (PVOID, u32, usize, *const c_void, usize, PVOID, *const usize) -> bool;
 pub type QueryFullProcessImageNameW = unsafe extern "system" fn (HANDLE, u32, *mut u16, *mut u32) -> i32;
 pub type MiniDumpWriteDump = unsafe extern "system" fn (HANDLE, u32, HANDLE, u32, *mut MINIDUMP_EXCEPTION_INFORMATION,
     *mut MINIDUMP_USER_STREAM_INFORMATION, *mut MINIDUMP_CALLBACK_INFORMATION) -> i32;
-pub type GetOverlappedResult = unsafe extern "system" fn (HANDLE, *mut OVERLAPPED, *mut u32, bool) -> BOOL;
+pub type GetOverlappedResult = unsafe extern "system" fn (HANDLE, *mut OVERLAPPED, *mut u32, bool) -> bool;
 pub type CreateFileA = unsafe extern "system" fn (*mut u8, u32, u32, *const SECURITY_ATTRIBUTES, u32, u32, HANDLE) -> HANDLE;
 pub type CreateFileW = unsafe extern "system" fn (*const u16, u32, u32, *const SECURITY_ATTRIBUTES, u32, u32, HANDLE) -> HANDLE;
 pub type ReadFile = unsafe extern "system" fn (HANDLE, PVOID, u32, *mut u32, *mut OVERLAPPED) -> i32; 
 pub type CreateTransaction = unsafe extern "system" fn (*mut SECURITY_ATTRIBUTES, *mut GUID, u32, u32, u32, u32, *mut u16) -> HANDLE;
 pub type CreateFileTransactedA = unsafe extern "system" fn (*mut u8, u32, u32, *const SECURITY_ATTRIBUTES, u32, u32, HANDLE,
     HANDLE, *const u32, PVOID) -> HANDLE;
-pub type CreateProcessWithLogon = unsafe extern "system" fn (*const u16, *const u16, *const u16, u32, *const u16, *mut u16, u32, *const c_void, *const u16, *const STARTUPINFOW, *mut PROCESS_INFORMATION) -> BOOL;
-pub type RollbackTransaction = unsafe extern "system" fn (HANDLE) -> BOOL;
+pub type CreateProcessWithLogon = unsafe extern "system" fn (*const u16, *const u16, *const u16, u32, *const u16, *mut u16, u32, *const c_void, *const u16, *const STARTUPINFOW, *mut PROCESS_INFORMATION) -> bool;
+pub type CreateProcessW = unsafe extern "system" fn (*const u16, *const u16, *const SECURITY_ATTRIBUTES, *const SECURITY_ATTRIBUTES, bool, u32, *const c_void, *const u16, *const STARTUPINFOW, *mut PROCESS_INFORMATION) -> bool;
+pub type RollbackTransaction = unsafe extern "system" fn (HANDLE) -> bool;
 pub type GetFileSize = unsafe extern "system" fn (HANDLE, *mut u32) -> u32;
 pub type CreateFileMapping = unsafe extern "system" fn (HANDLE, *const SECURITY_ATTRIBUTES, u32, u32, u32, *mut u8) -> HANDLE;
 pub type MapViewOfFile = unsafe extern "system" fn (HANDLE, u32, u32, u32, usize) -> PVOID;
-pub type UnmapViewOfFile = unsafe extern "system" fn (PVOID) -> BOOL;
+pub type UnmapViewOfFile = unsafe extern "system" fn (PVOID) -> bool;
 pub type ConvertThreadToFiber = unsafe extern "system" fn (PVOID) -> PVOID;
 pub type CreateFiber = unsafe extern "system" fn (usize, PVOID, PVOID) -> PVOID;
 pub type SwitchToFiber = unsafe extern "system" fn (PVOID);
@@ -56,10 +59,15 @@ pub type LocalAlloc = unsafe extern "system" fn (u32, usize) -> PVOID;
 pub type TlsAlloc = unsafe extern "system" fn () -> u32;
 pub type TlsGetValue = unsafe extern "system" fn (u32) -> PVOID;
 pub type TlsSetValue = unsafe extern "system" fn (u32, PVOID) -> bool;
+pub type CreateActCtxW = unsafe extern "system" fn (*mut ACTCTXW) -> HANDLE;
+pub type ActivateActCtx = unsafe extern "system" fn (HANDLE, *mut usize) -> bool;
+pub type ResumeThread = unsafe extern "system" fn (HANDLE) -> u32;
+pub type GetModuleHandleW = unsafe extern "system" fn (*mut u16) -> isize;
 pub type GetModuleHandleExA = unsafe extern "system" fn (i32,*const u8,*mut usize) -> bool;
 pub type GetModuleBaseNameW = unsafe extern "system" fn (HANDLE, usize, *mut u16, u32) -> u32;
 pub type GetModuleFileNameExW = unsafe extern "system" fn (HANDLE, usize, *mut u16, u32) -> u32;
 pub type GetSystemInfo = unsafe extern "system" fn (*mut SYSTEM_INFO);
+pub type VirtualQuery = unsafe extern "system" fn (*const c_void, *mut MEMORY_BASIC_INFORMATION, usize) -> usize; 
 pub type VirtualQueryEx = unsafe extern "system" fn (HANDLE, *const c_void, *mut MEMORY_BASIC_INFORMATION, usize) -> usize; 
 pub type LptopLevelExceptionFilter = usize;
 pub type AddVectoredExceptionHandler = unsafe extern "system" fn (first: u32, handle: usize) -> PVOID;
@@ -74,6 +82,13 @@ pub type BCryptDecrypt = unsafe extern "system" fn (HANDLE, *mut u8, u32, PVOID,
 pub type BCryptCloseAlgorithmProvider  = unsafe extern "system" fn (HANDLE, u32) -> i32;
 pub type CryptSignHashW = unsafe extern "system" fn (usize, u32, *mut u16, u32, *mut u8, *mut u32) -> bool;
 pub type CreateEventW = unsafe extern "system" fn (*const SECURITY_ATTRIBUTES, i32, i32, *const u16) -> HANDLE;
+pub type DeviceIoControl = unsafe extern "system" fn (HANDLE, u32, PVOID, u32, PVOID, u32, *mut u32, *mut OVERLAPPED) -> bool;
+pub type SetFilePointerEx = unsafe extern "system" fn (HANDLE, i64, *mut i64, u32) -> bool;
+pub type OpenFileById = unsafe extern "system" fn(HANDLE, *const FILE_ID_DESCRIPTOR, u32, u32, *const SECURITY_ATTRIBUTES, u32) -> HANDLE;
+pub type GetFinalPathNameByHandleW = unsafe extern "system" fn (HANDLE, *mut u16, u32, u32) -> u32;
+pub type CreateEnvironmentBlock = unsafe extern "system" fn (*mut PVOID, HANDLE, bool) -> bool;
+pub type GetThreadContext = unsafe extern "system" fn (HANDLE, *mut windows::Win32::System::Diagnostics::Debug::CONTEXT) -> bool;
+pub type SetThreadContext = unsafe extern "system" fn (HANDLE, *const windows::Win32::System::Diagnostics::Debug::CONTEXT) -> bool;
 pub type LdrGetProcedureAddress = unsafe extern "system" fn (PVOID, *mut String, u32, *mut PVOID) -> i32;
 pub type NtCreateTransaction = unsafe extern "system" fn (*mut HANDLE, u32, *mut OBJECT_ATTRIBUTES, *mut GUID, HANDLE, u32, u32, u32, *mut LARGE_INTEGER, *mut UNICODE_STRING) -> i32;
 pub type NtWriteVirtualMemory = unsafe extern "system" fn (HANDLE, PVOID, PVOID, usize, *mut usize) -> i32;
@@ -86,6 +101,7 @@ pub type NtQueryInformationFile = unsafe extern "system" fn (HANDLE, *mut IO_STA
 pub type NtDuplicateObject = unsafe extern "system" fn (HANDLE, HANDLE, HANDLE, *mut HANDLE, u32, u32, u32) -> i32;
 pub type NtQueryObject = unsafe extern "system" fn (HANDLE, u32, PVOID, u32, *mut u32) -> i32;
 pub type NtCreateUserProcess = unsafe extern "system" fn (*mut HANDLE, *mut HANDLE,u32, u32, *mut OBJECT_ATTRIBUTES,*mut OBJECT_ATTRIBUTES, u32, u32, PVOID, *mut PsCreateInfo, *mut PsAttributeList) -> i32;
+pub type NtCreateProcessEx = unsafe extern "system" fn (*mut HANDLE, u32, *mut OBJECT_ATTRIBUTES, HANDLE, u32, HANDLE, HANDLE, HANDLE, u32) -> i32;
 pub type NtOpenFile = unsafe extern "system" fn (*mut HANDLE, u32, *mut OBJECT_ATTRIBUTES, *mut IO_STATUS_BLOCK, u32, u32) -> i32;
 pub type NtCreateSection = unsafe extern "system" fn (*mut HANDLE, u32, *mut OBJECT_ATTRIBUTES, *mut LARGE_INTEGER, u32, u32, HANDLE) -> i32;
 pub type NtMapViewOfSection = unsafe extern "system" fn (HANDLE, HANDLE, *mut PVOID, usize, usize, *mut LARGE_INTEGER, *mut usize, u32, u32, u32) -> i32;
@@ -101,12 +117,16 @@ pub type NtOpenProcessToken = unsafe extern "system" fn (HANDLE, u32, *mut HANDL
 pub type NtDuplicateToken = unsafe extern "system" fn (HANDLE, u32, *mut OBJECT_ATTRIBUTES, bool, u32, *mut HANDLE) -> i32;
 pub type NtCreateKey = unsafe extern "system" fn (*mut HANDLE, u32, *mut OBJECT_ATTRIBUTES, u32, *mut UNICODE_STRING, u32, *mut u32) -> i32;
 pub type NtSetValueKey = unsafe extern "system" fn (HANDLE, *const UNICODE_STRING, u32, u32, *const c_void, u32) -> i32;
+pub type NtCommitTransaction = unsafe extern "system" fn (HANDLE, bool) -> i32;
+pub type NtUnmapViewOfSection = unsafe extern "system" fn (HANDLE, PVOID) -> i32;
 pub type RtlAdjustPrivilege = unsafe extern "system" fn (u32, u8, u8, *mut u8) -> i32;
 pub type RtlInitUnicodeString = unsafe extern "system" fn (*mut UNICODE_STRING, *const u16) -> () ;
 pub type RtlZeroMemory = unsafe extern "system" fn (PVOID, usize) -> ();
 pub type RtlQueueWorkItem = unsafe extern "system" fn (usize, PVOID, u32) -> i32;
 pub type RtlAddFunctionTable = unsafe extern "system" fn (usize, i32, usize) -> bool;
-pub type NtCommitTransaction = unsafe extern "system" fn (HANDLE, bool) -> i32;
+pub type RtlDecompressBuffer = unsafe extern "system" fn (u16, *mut u8, u32, *const u8, u32, *mut u32) -> i32;
+pub type RtlCreateProcessParametersEx = unsafe extern "system" fn (*mut *mut RtlUserProcessParameters, *mut UNICODE_STRING, *mut UNICODE_STRING, *mut UNICODE_STRING,
+    *mut UNICODE_STRING, PVOID, *mut UNICODE_STRING, *mut UNICODE_STRING, *mut UNICODE_STRING, *mut UNICODE_STRING, u32) -> i32;
 
 pub const JMP_RBX: u16 = 9215;
 pub const ADD_RSP: u32 = 1489273672;// add rsp,0x58 -> up to 11 parameters
@@ -137,6 +157,7 @@ pub const PAGE_EXECUTE: u32 = 0x10;
 pub const PAGE_EXECUTE_READ: u32 = 0x20;
 pub const PAGE_EXECUTE_READWRITE: u32 = 0x40;
 pub const PAGE_EXECUTE_WRITECOPY: u32 = 0x80;
+pub const PAGE_GUARD: u32 = 0x100;
 
 pub const MEM_COMMIT: u32 = 0x1000;
 pub const MEM_RESERVE: u32 = 0x2000;
@@ -160,7 +181,7 @@ pub const FILE_SHARE_READ: u32 = 0x1;
 pub const FILE_SHARE_WRITE: u32 = 0x2;
 pub const FILE_SHARE_DELETE: u32 = 0x4;
 
-//File access flags
+// File access flags
 pub const DELETE: u32 = 0x10000;
 pub const FILE_READ_DATA: u32 = 0x1;
 pub const FILE_READ_ATTRIBUTES: u32 = 0x80;
@@ -174,6 +195,34 @@ pub const WRITE_DAC: u32 = 0x40000;
 pub const WRITE_OWNER: u32 = 0x80000;
 pub const SYNCHRONIZE: u32 = 0x100000;
 pub const FILE_EXECUTE: u32 = 0x20;
+
+// Creation disposition flags
+pub const CREATE_NEW: u32 = 1;
+pub const CREATE_ALWAYS: u32 = 2;
+pub const OPEN_EXISTING: u32 = 3;
+pub const OPEN_ALWAYS: u32 = 4;
+pub const TRUNCATE_EXISTING: u32 = 5;
+
+// Flags and Attributes
+pub const FILE_ATTRIBUTE_ARCHIVE: u32 = 0x20;
+pub const FILE_ATTRIBUTE_ENCRYPTED: u32 = 0x4000;
+pub const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+pub const FILE_ATTRIBUTE_NORMAL: u32 = 0x80;
+pub const FILE_ATTRIBUTE_OFFLINE: u32 = 0x1000;
+pub const FILE_ATTRIBUTE_READONLY: u32 = 0x1;
+pub const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+pub const FILE_ATTRIBUTE_TEMPORARY: u32 = 0x100;
+pub const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x02000000;
+pub const FILE_FLAG_DELETE_ON_CLOSE: u32 = 0x04000000;
+pub const FILE_FLAG_NO_BUFFERING: u32 = 0x20000000;
+pub const FILE_FLAG_OPEN_NO_RECALL: u32 = 0x00100000;
+pub const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x00200000;
+pub const FILE_FLAG_OVERLAPPED: u32 = 0x40000000;
+pub const FILE_FLAG_POSIX_SEMANTICS: u32 = 0x01000000;
+pub const FILE_FLAG_RANDOM_ACCESS: u32 = 0x10000000;
+pub const FILE_FLAG_SESSION_AWARE: u32 = 0x00800000;
+pub const FILE_FLAG_SEQUENTIAL_SCAN: u32 = 0x08000000;
+pub const FILE_FLAG_WRITE_THROUGH: u32 = 0x80000000;
 
 // File open flags
 pub const FILE_SYNCHRONOUS_IO_NONALERT: u32 = 0x20;
@@ -278,6 +327,20 @@ pub struct PeManualMap {
     pub decoy_module: String,
     pub base_address: usize,
     pub pe_info: PeMetadata,
+}
+
+#[repr(C)]
+pub struct PeSectionMap {
+    pub section_handle: usize,
+    pub base_address: usize,
+    pub pe_info: PeMetadata,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RegionInfo { // To store the result of a VirtualQuery call
+    pub base_address: usize,
+    pub region_size: usize,
+    pub memory_protection: u32,
 }
 
 #[repr(C)]
@@ -637,5 +700,67 @@ pub struct ThreadBasicInformation {
     pub affinity_mask: usize,
     pub priority: i32,
     pub base_priority: i32,
+}
 
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct RtlUserProcessParameters {
+    pub maximum_length: u32,
+    pub length: u32,
+    pub flags: u32,
+    pub debug_flags: u32,
+    pub console_handle: HANDLE,
+    pub console_flags: u32,
+    pub standard_input: HANDLE,
+    pub standard_output: HANDLE,
+    pub standard_error: HANDLE,
+    pub current_directory: CURDIR,
+    pub dll_path: UNICODE_STRING,
+    pub image_path_name: UNICODE_STRING,
+    pub command_line: UNICODE_STRING,
+    pub environment: PVOID,
+    pub starting_x: u32,
+    pub starting_y: u32,
+    pub count_x: u32,
+    pub count_y: u32,
+    pub count_chars_x: u32,
+    pub count_chars_y: u32,
+    pub fill_attribute: u32,
+    pub window_flags: u32,
+    pub show_window_flags: u32,
+    pub window_title: UNICODE_STRING,
+    pub desktop_info: UNICODE_STRING,
+    pub shell_info: UNICODE_STRING,
+    pub runtime_data: UNICODE_STRING,
+    pub current_directories: [RtlDriveLetterCurdir; 32],
+    pub environment_size: usize,
+    pub environment_version: usize,
+    pub package_dependency_data: PVOID,
+    pub process_group_id: u32,
+    pub loader_threads: u32,
+    pub redirection_dll_name: UNICODE_STRING, 
+    pub heap_partition_name: UNICODE_STRING,
+    pub default_threadpool_cpu_set_masks: *mut c_void,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct CURDIR {
+    pub dos_path: UNICODE_STRING,
+    pub handle: HANDLE,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct RtlDriveLetterCurdir {
+    pub flags: u16,
+    pub length: u16,
+    pub time_stamp: u32,
+    pub dos_path: UNICODE_STRING, // I'm not sure this is a UNICODE_STRING but the struct seems to have same size
+}
+
+#[repr(align(16))]
+#[derive(Default)]
+pub struct AlignedContext {
+    pub ctx: windows::Win32::System::Diagnostics::Debug::CONTEXT
 }

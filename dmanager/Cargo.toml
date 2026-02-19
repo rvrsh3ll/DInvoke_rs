@@ -17,7 +17,7 @@ litcrypt2 = "=0.1.2"
 dinvoke = { path = "../dinvoke" }
 
 [dependencies.windows]
-version = "0.51"
+version = "0.62"
 features = [
     "Win32_Foundation"
 ]

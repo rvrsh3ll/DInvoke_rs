@@ -19,6 +19,7 @@ manualmap = { path = "manualmap" }
 data = { path = "data" }
 overload = { path = "overload" }
 dmanager = { path = "dmanager" }
+utils = { path = "utils" }
 
 [build-dependencies]
 static_vcruntime = "2.0"

